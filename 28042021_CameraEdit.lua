@@ -1,164 +1,217 @@
-gg.clearResults()
-gg.setRanges(gg.REGION_ANONYMOUS)
+tools = require "tools"
 
-local tools = require "tools"
-local camera = require "camera"
+function getPossibleEntries()
+    -- возвращает потенциальные вхождения структур для камеры
 
-do
-		local r
+    gg.clearResults()
+    gg.searchNumber(tostring(-0.07), gg.TYPE_FLOAT)
+    local result = gg.getResults(1024)
+    gg.clearResults()
 
-		-- search for possible entries
-		do
-				gg.clearResults()
-				gg.searchNumber(tostring(-0.07), gg.TYPE_FLOAT)
-				r = gg.getResults(1024)
-				gg.clearResults()
-		end
-
-		-- get full camera's data (not single entries)
-		do
-				local tmp = {}
-
-				for _, var in ipairs(r) do
-						local end_address = var.address
-
-						local FLOAT_SIZE = 4
-						for offset=-20, 0, FLOAT_SIZE do
-							 table.insert(tmp, {
-								 address = end_address + offset,
-								 flags = gg.TYPE_FLOAT
-							 })
-						end
-				end
-
-				r = gg.getValues(tmp)
-		end
-
-		-- split r by camera's chunks
-		do
-				local chunks = tools.split_by_chunks(r, 6)
-
-				-- simple validation
-				r = {}
-
-				local allowed_sets = {
-					{
-						name = 'LOW BLUE',
-						values = {6.54, -9.37, 6.27, 42.86, 44.90, -0.07}},
-					{
-						name = 'LOW RED',
-						values = {-6.54, -9.37, -6.27, 42.86, -134.10, -0.07}
-					},
-					{
-						name = 'HIGH BLUE',
-						values = {7.66, -10.98, 7.62, 42.86, 44.90, -0.07}
-					},
-					{
-						name = 'HIGH RED',
-						values = {-7.66, -10.98, -7.62, 42.86, -134.10, -0.07}
-					},
-				}
-
-				for _, chunk in ipairs(chunks) do
-						for _, set in ipairs(allowed_sets) do
-								local is_set_equal = true
-								for i, var in ipairs(chunk) do
-										local val1 = tonumber(var.value)
-										local val2 = set.values[i]
-
-										local is_equal = tools.is_floats_equal(val1, val2, 1e-3)
-										is_set_equal = is_set_equal and is_equal
-								end
-
-								if is_set_equal then
-										-- add labels (remove it before compile)
-										for _, var in ipairs(chunk) do
-												var.name = set.name
-										end
-										-- end of remove
-
-										table.insert(r, chunk)
-										break
-								end
-						end
-				end
-		end
-
-		-- insert camera's into save list (remove it before compile)
-		do
-				local tmp = {}
-				for _, chunk in ipairs(r) do
-						for _, var in ipairs(chunk) do
-								table.insert(tmp, var)
-						end
-				end
-				gg.addListItems(tmp)
-		end
-		-- end of remove
-
-		-- camera init
-		camera:init_by_structs(r)
+    return result
 end
 
--- main ui loop
-is_exit = false
+function getVariablesFromPossibleEntries(entries)
+    -- возвращает переменные структур камеры из областей памяти с потенциальными вхождениями
+    local variables = {}
 
-if camera.count == 0 then
-		print('Ничего не найдено')
-		is_exit = true
+    for _, var in ipairs(entries) do
+        local max_address = var.address
+
+        local FLOAT_SIZE = 4
+        for offset = -5 * FLOAT_SIZE, 0, FLOAT_SIZE do
+            table.insert(variables, {
+                address = max_address + offset,
+                flags = gg.TYPE_FLOAT,
+            })
+        end
+    end
+
+    variables = gg.getValues(variables)
+    return variables
 end
 
-local menu_buttons = {
-	'Настройки',
-	'Восстановить',
-	'Выход'
-}
+function getValidatedStructs(structs)
+    -- простейшая валидация
+    local results = {}
 
-local menu_actions = {
-	function()
-			local input = gg.prompt({
-				'Множитель расстояния: [10; 25]',
-				'Добавочный угол: [0; 30]',
-				'Обнулить вращение проекции:'},
-				{tonumber(string.format('%i', camera.distance * 10 // 1)), camera.a_degree, true},
-				{'number', 'number', 'checkbox'})
+    local allowed_structs = {
+        {
+            name = 'LOW BLUE',
+            values = { 6.54, -9.37, 6.27, 42.86, 44.90, -0.07 }
+        },
+        {
+            name = 'LOW RED',
+            values = { -6.54, -9.37, -6.27, 42.86, -134.10, -0.07 }
+        },
+        {
+            name = 'HIGH BLUE',
+            values = { 7.66, -10.98, 7.62, 42.86, 44.90, -0.07 }
+        },
+        {
+            name = 'HIGH RED',
+            values = { -7.66, -10.98, -7.62, 42.86, -134.10, -0.07 }
+        },
+    }
 
-			if not input then
-					return nil
-			end
+    for _, struct in ipairs(structs) do
+        for _, set in ipairs(allowed_structs) do
+            local is_set_equal = true
+            for i, var in ipairs(struct) do
+                local val1 = tonumber(var.value)
+                local val2 = set.values[i]
 
-			camera:set_rotate_vertical(input[2])
-			camera:set_distance(input[1] * 0.1)
-			
-			if input[3] then
-					camera:set_rotate_image(0.07)
-			end
+                local is_equal = tools.isFloatsEqual(val1, val2, 1e-3)
+                is_set_equal = is_set_equal and is_equal
+            end
 
-			camera:update()
-	end,
-	function()
-			camera:reset()
-			camera:update()
-	end,
-	function()
-			is_exit = true
-	end,
-}
+            if is_set_equal then
+                -- добавляем подписи к переменным
+                for _, var in ipairs(struct) do
+                    var.name = set.name
+                end
 
-gg.showUiButton()
-while not is_exit do
-		if gg.isClickedUiButton() then
-				gg.hideUiButton()
+                -- сохраняем структуру, если она валидна
+                table.insert(results, struct)
+                break
+            end
+        end
+    end
 
-				local info, way
-				info = string.format('found: %i / 8 | dist: %.2f | angle: %.2f', camera.count, camera.distance, camera.a_degree)
-				way = gg.choice(menu_buttons, nil, info)
-
-				if way then
-						menu_actions[way]()
-				end
-
-				gg.showUiButton()
-		end
-		gg.sleep(250)
+    return results
 end
+
+function getCamera()
+    -- находим потенциальные вхождения концов структур
+    local possible_entries = getPossibleEntries()
+    -- извлекаем все переменные из потенциальных структур
+    local variables = getVariablesFromPossibleEntries(possible_entries)
+    -- делим все переменные на отдельные структуры
+    local structs = tools.getSplittedByChunks(variables, 6)
+    -- отфильтровываем некорректные структуры
+    structs = getValidatedStructs(structs)
+
+    -- добавляем структуры камеры в список сохранённых переменных GG
+    --[[
+    do
+        local tmp = {}
+        for _, chunk in ipairs(r) do
+            for _, var in ipairs(chunk) do
+                table.insert(tmp, var)
+            end
+        end
+        gg.addListItems(tmp)
+    end
+    ]]--
+
+    -- инициализируем камеру найденными структурами
+    local camera = require "camera"
+    camera:initFromStructs(structs)
+    return camera
+end
+
+function runUIMenuLoop(interactWithUser)
+    -- Бесконечный цикл с меню и действиями.
+    -- Для выхода необходимо действие с os.exit()
+
+    gg.showUiButton()
+
+    -- бесконечный цикл в котором выполняются действия,
+    -- привязанные к определённым кнопкам
+    while true do
+        interactWithUser()
+        gg.sleep(250)
+    end
+end
+
+function main()
+    -- главная функция
+
+    -- чистим список поиска
+    gg.clearResults()
+    -- настраиваем регионы для быстрого поиска
+    gg.setRanges(gg.REGION_ANONYMOUS)
+
+    -- поиск структур и сохранение их в камеру
+    local camera = getCamera()
+
+    if camera.count == 0 then
+        print('Ничего не найдено')
+        return
+    end
+
+    local menu_labels = {
+        [1] = 'Настройки',
+        [2] = 'Восстановить',
+        [3] = 'Выход',
+    }
+
+    local menu_actions = {
+        [1] = function()
+            local input = gg.prompt(
+                    {
+                        'Множитель расстояния: [10; 25]',
+                        'Добавочный угол: [0; 30]',
+                        'Обнулить вращение проекции:',
+                    },
+                    {
+                        tonumber(string.format('%i', camera.distance * 10 // 1)),
+                        camera.a_degree,
+                        true,
+                    },
+                    { 'number', 'number', 'checkbox' }
+            )
+
+            if input == nil then
+                return nil
+            end
+
+            camera:setRotateVertical(input[2])
+            camera:setDistance(input[1] * 0.1)
+
+            if input[3] then
+                camera:setRotateProjection(0.07)
+            end
+
+            camera:update()
+        end,
+        [2] = function()
+            camera:reset()
+            camera:update()
+        end,
+        [3] = function()
+            print("Завершено пользователем")
+            os.exit(0)
+        end,
+    }
+
+    local function interactWithUser()
+        if gg.isClickedUiButton() then
+            gg.hideUiButton()
+
+            local info_text = string.format(
+                    'found: %i / 8 | dist: %.2f | angle: %.2f',
+                    camera.count, camera.distance, camera.a_degree
+            )
+            print(info_text)
+
+            local selected_way = gg.choice(menu_labels, nil, info_text)
+            if selected_way ~= nil then
+                menu_actions[selected_way]()
+            end
+
+            gg.showUiButton()
+        end
+    end
+
+    gg.showUiButton()
+
+    runUIMenuLoop(interactWithUser)
+end
+
+if gg == nil then
+    print("WARN: 'gg' недоступен. Используется mock-версия для теста")
+    gg = require "mock_gg"
+end
+
+main()
