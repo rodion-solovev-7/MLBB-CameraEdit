@@ -53,7 +53,7 @@ function camera._setAngles(self, a, b, c)
         local value = var.value
         self.angles.c[i].value = (pi2 + value + c) % pi2
     end
-    self:_recalc_offsets()
+    self:_recalcOffsets()
 end
 
 function camera._setOffsets(self, x, y, z)
@@ -153,27 +153,27 @@ end
 
 function camera.setDistanceToPlayer(self, d)
     -- устанавливает множитель расстояния до игрока
-    self:_set_offsets(d, d, d)
+    self:_setOffsets(d, d, d)
     self.distance = d
 end
 
 function camera.setRotateVertical(self, degree)
     -- устанавливает смещение угла взгляда (выше, ниже) на игрока
     self.a_degree = degree
-    self:_set_angles(self.a_degree, self.b_degree, self.c_degree)
+    self:_setAngles(self.a_degree, self.b_degree, self.c_degree)
 end
 
 function camera.setRotateHorizontal(self, degree)
     -- устанавливает смещение угла взгляда (правее, левее) на игрока
     self.b_degree = degree
-    self:_set_angles(self.a_degree, self.b_degree, self.c_degree)
+    self:_setAngles(self.a_degree, self.b_degree, self.c_degree)
 end
 
 function camera.setRotateProjection(self, degree)
     -- устанавливает смещение угла проекции изображение
     -- (насколько картинка поворачивается вокруг своей оси)
     self.c_degree = degree
-    self:_set_angles(self.a_degree, self.b_degree, self.c_degree)
+    self:_setAngles(self.a_degree, self.b_degree, self.c_degree)
 end
 
 function camera.reset(self)

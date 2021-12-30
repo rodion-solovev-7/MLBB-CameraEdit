@@ -1,4 +1,4 @@
-tools = require "tools"
+tools = require("tools")
 
 function getPossibleEntries()
     -- возвращает потенциальные вхождения структур для камеры
@@ -12,7 +12,9 @@ function getPossibleEntries()
 end
 
 function getVariablesFromPossibleEntries(entries)
-    -- возвращает переменные структур камеры из областей памяти с потенциальными вхождениями
+    -- возвращает переменные структур камеры из областей памяти
+    -- с потенциальными вхождениями
+
     local variables = {}
 
     for _, var in ipairs(entries) do
@@ -32,7 +34,7 @@ function getVariablesFromPossibleEntries(entries)
 end
 
 function getValidatedStructs(structs)
-    -- простейшая валидация
+    -- простейшая валидация найденных структур
     local results = {}
 
     local allowed_structs = {
@@ -81,31 +83,9 @@ function getValidatedStructs(structs)
     return results
 end
 
-function getCamera()
-    -- находим потенциальные вхождения концов структур
-    local possible_entries = getPossibleEntries()
-    -- извлекаем все переменные из потенциальных структур
-    local variables = getVariablesFromPossibleEntries(possible_entries)
-    -- делим все переменные на отдельные структуры
-    local structs = tools.getSplittedByChunks(variables, 6)
-    -- отфильтровываем некорректные структуры
-    structs = getValidatedStructs(structs)
-
-    -- добавляем структуры камеры в список сохранённых переменных GG
-    --[[
-    do
-        local tmp = {}
-        for _, chunk in ipairs(r) do
-            for _, var in ipairs(chunk) do
-                table.insert(tmp, var)
-            end
-        end
-        gg.addListItems(tmp)
-    end
-    ]]--
-
+function getCamera(structs)
     -- инициализируем камеру найденными структурами
-    local camera = require "camera"
+    local camera = require("camera")
     camera:initFromStructs(structs)
     return camera
 end
@@ -132,12 +112,34 @@ function main()
     -- настраиваем регионы для быстрого поиска
     gg.setRanges(gg.REGION_ANONYMOUS)
 
+    -- находим потенциальные вхождения концов структур
+    local possible_entries = getPossibleEntries()
+    -- извлекаем все переменные из потенциальных структур
+    local variables = getVariablesFromPossibleEntries(possible_entries)
+    -- делим все переменные на отдельные структуры
+    local structs = tools.getSplittedByChunks(variables, 6)
+    -- отфильтровываем некорректные структуры
+    structs = getValidatedStructs(structs)
+
+    -- добавляем структуры камеры в список сохранённых переменных GG
+    --[[
+    do
+        local tmp = {}
+        for _, chunk in ipairs(r) do
+            for _, var in ipairs(chunk) do
+                table.insert(tmp, var)
+            end
+        end
+        gg.addListItems(tmp)
+    end
+    ]]--
+
     -- поиск структур и сохранение их в камеру
-    local camera = getCamera()
+    local camera = getCamera(structs)
 
     if camera.count == 0 then
         print('Ничего не найдено')
-        return
+        os.exit(0)
     end
 
     local menu_labels = {
@@ -167,7 +169,7 @@ function main()
             end
 
             camera:setRotateVertical(input[2])
-            camera:setDistance(input[1] * 0.1)
+            camera:setDistanceToPlayer(input[1] * 0.1)
 
             if input[3] then
                 camera:setRotateProjection(0.07)
@@ -209,9 +211,11 @@ function main()
     runUIMenuLoop(interactWithUser)
 end
 
+-- Начало выполнения
+
 if gg == nil then
     print("WARN: 'gg' недоступен. Используется mock-версия для теста")
-    gg = require "mock_gg"
+    gg = require("mock_gg")
 end
 
 main()
