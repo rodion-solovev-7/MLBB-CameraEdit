@@ -195,7 +195,6 @@ function main()
                     'found: %i / 8 | dist: %.2f | angle: %.2f',
                     camera.count, camera.distance, camera.a_degree
             )
-            print(info_text)
 
             local selected_way = gg.choice(menu_labels, nil, info_text)
             if selected_way ~= nil then
